@@ -1,4 +1,5 @@
 # RankPerms
+This is a permissions plugin for BDSX.
 
 ## Commands
 * `/myrank` - `Check your rank`
