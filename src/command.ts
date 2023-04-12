@@ -3,6 +3,7 @@ import { MinecraftPacketIds } from "bdsx/bds/packetids";
 import { CustomCommandFactory } from "bdsx/command";
 import { events } from "bdsx/event";
 import { bedrockServer } from "bdsx/launcher";
+import EventEmitter = require("events");
 import { Permissions } from "..";
 
 interface CommandPermission {
@@ -11,6 +12,8 @@ interface CommandPermission {
     perm: string;
     level: CommandPermissionLevel;
 }
+
+const onreload = new EventEmitter();
 
 const commands = new Map<string, string>();
 
@@ -62,7 +65,13 @@ export const commandPerm = {
         for (const player of bedrockServer.serverInstance.getPlayers()) {
             player.sendNetworkPacket(pkt);
         }
+        onreload.emit("CommandRankReloadEvent");
         pkt.dispose();
+    },
+    onReloading(callback: () => void) {
+        onreload.on("CommandRankReloadEvent", () => {
+            callback();
+        });
     }
 };
 

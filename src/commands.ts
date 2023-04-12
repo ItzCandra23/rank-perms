@@ -75,7 +75,5 @@ setrank.overload((p, o) => {
 const rankreload = commandPerm.register("rankreload", "Reload all permission command.", "rank-perms.command.rankreload", CommandPermissionLevel.Operator);
 
 rankreload.overload((p, o) => {
-    const actor = o.getEntity()?.getNetworkIdentifier().getActor();
-    if (actor === null) return;
     commandPerm.reload();
 }, {});
