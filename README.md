@@ -13,7 +13,7 @@ This is a permissions plugin for BDSX.
 * `/setrank` - `rank-perms.command.setrank`
 * `/rankreload` - `rank-perms.command.rankreload`
 
-## Custom COmmand Permission
+## Custom Command Permission
 ```ts
 import { commandPerm } from "@bdsx/rank-perms/src/command";
 import { MobEffectIds, MobEffectInstance } from "bdsx/bds/effects";
