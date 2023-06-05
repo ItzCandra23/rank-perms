@@ -1,4 +1,4 @@
-import { ServerPlayer } from "bdsx/bds/player";
+import { Player } from "bdsx/bds/player";
 import { send, sendMessage } from "./src/utils/message";
 import { Permission, Ranks } from "./src";
 import { PlayerRank } from "./src/player";
@@ -6,7 +6,7 @@ import { events } from "bdsx/event";
 import { commandPerm } from "./src/command";
 
 export namespace RankPerms {
-    export function createRank(rank: string, display?: string, actor?: ServerPlayer): boolean {
+    export function createRank(rank: string, display?: string, actor?: Player): boolean {
         const send = new sendMessage(actor);
         if (Ranks.has(rank)) {
             send.error(`Rank already!`);
@@ -25,7 +25,7 @@ export namespace RankPerms {
         return Ranks.add(rank, display);
     }
 
-    export function deleteRank(rank: string, actor?: ServerPlayer): boolean {
+    export function deleteRank(rank: string, actor?: Player): boolean {
         const send = new sendMessage(actor);
         if (!Ranks.has(rank)) {
             send.error(`Rank not found!`);
@@ -49,10 +49,31 @@ export namespace RankPerms {
     export function has(rank: string): boolean {
         return Ranks.has(rank);
     }
+
+    export function setPlayerRank(player: Player, rank: string): boolean {
+        return PlayerRank.setRank(rank, player.getXuid());
+    }
+
+    export function getPlayerRank(player: Player): string|null {
+        return PlayerRank.getRank(player.getXuid());
+    }
+
+    export function setDisplayRank(rank: string, display: string): boolean {
+        return Ranks.setDisplay(rank, display);
+    }
+
+    export function getDisplayRank(rank: string): string|null {
+        return Ranks.getDisplay(rank);
+    }
+
+    export function save(message: boolean = false) {
+        Ranks.save(message);
+        PlayerRank.save(message);
+    }
 }
 
 export namespace Permissions {
-    export function check(perm: string, player: ServerPlayer): boolean {
+    export function check(perm: string, player: Player): boolean {
         const rank = PlayerRank.getRank(player.getXuid());
         if (!rank) return Permission.has(Ranks.getRanks()[0], perm);
         return Permission.has(rank, perm);
@@ -63,7 +84,7 @@ export namespace Permissions {
         else return commandPerm.setPermission(name, perm);
     }
 
-    export function setRank(rank: string, player: ServerPlayer, actor?: ServerPlayer): boolean {
+    export function setRank(rank: string, player: Player, actor?: Player): boolean {
         const xuid = player.getXuid();
         const send = new sendMessage(actor);
         if (xuid === ""||xuid.includes(" ")) {
@@ -79,11 +100,11 @@ export namespace Permissions {
         return PlayerRank.setRank(rank, xuid);
     }
 
-    export function getRank(player: ServerPlayer): string {
+    export function getRank(player: Player): string {
         return PlayerRank.getRank(player.getXuid()) ?? Ranks.getRanks()[0];
     }
 
-    export function addPermission(rank: string, permission: string, actor?: ServerPlayer): boolean {
+    export function addPermission(rank: string, permission: string, actor?: Player): boolean {
         const send = new sendMessage(actor);
         if (!Ranks.has(rank)) {
             send.error(`Rank not found!`);
@@ -102,7 +123,7 @@ export namespace Permissions {
         return Permission.add(rank, permission);
     }
 
-    export function removePermission(rank: string, permission: string, actor?: ServerPlayer): boolean {
+    export function removePermission(rank: string, permission: string, actor?: Player): boolean {
         const send = new sendMessage(actor);
         if (!Ranks.has(rank)) {
             send.error(`Rank not found!`);
@@ -117,7 +138,7 @@ export namespace Permissions {
         return Permission.remove(rank, permission);
     }
 
-    export function setPermission(rank: string, permission: string, newPermission: string, actor?: ServerPlayer): boolean {
+    export function setPermission(rank: string, permission: string, newPermission: string, actor?: Player): boolean {
         const send = new sendMessage(actor);
         if (!Ranks.has(rank)) {
             send.error(`Rank not found!`);
@@ -145,7 +166,9 @@ export namespace Permissions {
     }
 }
 
-events.playerJoin.on((ev) => { PlayerRank.addPlayer(ev.player.getXuid()) });
+events.playerJoin.on((ev) => {
+    PlayerRank.addPlayer(ev.player.getXuid());
+});
 
 events.serverOpen.on(() => {
     require("./src");
@@ -154,6 +177,5 @@ events.serverOpen.on(() => {
 });
 
 events.serverClose.on(() => {
-    Ranks.save(true);
-    PlayerRank.save(true);
+    RankPerms.save(true);
 });
