@@ -5,6 +5,7 @@ import { events } from "bdsx/event";
 import { bedrockServer } from "bdsx/launcher";
 import EventEmitter = require("events");
 import { Permissions } from "..";
+import { AvailableCommandsPacket } from "bdsx/bds/packets";
 
 interface CommandPermission {
     name: string;
@@ -62,9 +63,13 @@ export const commandPerm = {
     },
     reload(): void {
         const pkt = bedrockServer.commandRegistry.serializeAvailableCommands();
-        for (const player of bedrockServer.serverInstance.getPlayers()) {
+        const players = bedrockServer.serverInstance.getPlayers();
+
+        for (let i = 0; i < players.length; i++) {
+            const player = players[i];
             player.sendNetworkPacket(pkt);
         }
+
         onreload.emit("CommandRankReloadEvent");
         pkt.dispose();
     },
@@ -75,20 +80,36 @@ export const commandPerm = {
     }
 };
 
-events.packetSend(MinecraftPacketIds.AvailableCommands).on((pkt, ni) => {
-    const player = ni.getActor();
-    if (!player) return;
+// Wait Update
+// events.packetSend(MinecraftPacketIds.AvailableCommands).on((pkt, ni) => {
+//     const player = ni.getActor();
+//     if (!player) return;
 
-    for (let i = 0; i < pkt.commands.size(); i++) {
-        for (const [cmd, perm] of commands.entries()) {
-            if (pkt.commands.get(i).name === cmd && !Permissions.check(perm, player)) pkt.commands.splice(i, 1);
-        }
-    }
-});
+//     const newPkt = AvailableCommandsPacket.construct(pkt);
+//     AvailableCommandsPacket.apply(newPkt, AvailableCommandsPacket.contentSize);
+
+//     for (let i = 0; i < newPkt.commands.size(); i++) {
+//         const cmds: [string, string][] = Array.from(commands.entries());
+
+//         for (let i_ = 0; i_ < cmds.length; i_++) {
+//             const [cmd, perm] = cmds[i_];
+
+//             if (newPkt.commands.get(i).name === cmd && !Permissions.check(perm, player)) {
+//                 // newPkt.commands.splice(i, 1);
+//                 console.log(newPkt.commands.get(i).name);
+//             }
+//         }
+//     }
+
+//     newPkt.sendTo(ni);
+//     newPkt.destruct();
+// });
 
 events.command.on((command, username, ctx) => {
     const fixCmd = command.split(" ")[0];
-    for (const [cmd, perm] of commands.entries()) {
+    const cmds: [string, string][] = Array.from(commands.entries());
+    for (let i = 0; i < cmds.length; i++) {
+        const [cmd, perm] = cmds[i];
         if (fixCmd === `/${cmd}`) {
             const entity = ctx.origin.getEntity();
             if (!entity) return;

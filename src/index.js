@@ -1,155 +1,108 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Permission = exports.Ranks = void 0;
+exports.PlayerRank = void 0;
+const __1 = require("..");
 const message_1 = require("./utils/message");
+const command_1 = require("./command");
 const path = require("path");
 const fs = require("fs");
-require("./player");
-require("./command");
-let ranks = {
-    Guest: {
-        display: "&l&aGuest",
-        permissions: [
-            "rank-perms.command.myrank",
-        ],
-    },
-    Admin: {
-        display: "&l&cAdmin",
-        permissions: [
-            "rank-perms.command.myrank",
-            "rank-perms.command.rankadm",
-        ],
-    },
-    Owner: {
-        display: "&l&dOwner",
-        permissions: [
-            "rank-perms.command.myrank",
-            "rank-perms.command.rankadm",
-            "rank-perms.command.setrank",
-            "rank-perms.command.rankreload",
-        ],
-    },
-};
-const rankPath = path.join(__dirname, "..", "ranks.json");
+let players = {};
+const playerRankPath = path.join(__dirname, "..", "players.json");
 try {
-    ranks = require(rankPath);
+    players = require(playerRankPath);
 }
 catch (err) {
     if (err)
-        fs.writeFileSync(rankPath, JSON.stringify(ranks), "utf8");
+        fs.writeFileSync(playerRankPath, JSON.stringify(players), "utf8");
 }
-var Ranks;
-(function (Ranks) {
-    function add(name, display) {
-        if (ranks.hasOwnProperty(name))
+/**PlayerRank */
+class PlayerRank {
+    constructor(xuid) {
+        this.xuid = xuid;
+    }
+    static rank(player) {
+        return new PlayerRank(player.getXuid());
+    }
+    static rankByXuid(xuid) {
+        return new PlayerRank(xuid);
+    }
+    static has(xuid) {
+        return players.hasOwnProperty(xuid);
+    }
+    /**Add player */
+    static addPlayer(player) {
+        if (player.getXuid() === "")
             return false;
-        if (name === "" || name.includes(" "))
+        if (this.has(player.getXuid()))
             return false;
-        ranks[name] = {
-            display: display !== null && display !== void 0 ? display : name,
-            permissions: [],
-        };
+        players[player.getXuid()] = __1.RankPerms.getRanks()[0];
         return true;
     }
-    Ranks.add = add;
-    function remove(rank) {
-        if (!ranks.hasOwnProperty(rank))
-            return false;
-        if (getRanks().length === 1)
-            return false;
-        delete ranks[rank];
-        return true;
+    /**Set player rank */
+    static async setRank(player, rank) {
+        return new Promise((resolve, reject) => {
+            if (player.getXuid() === "") {
+                reject(`Xuid not found!`);
+                return;
+            }
+            if (!__1.RankPerms.hasRank(rank)) {
+                reject(`Rank not found!`);
+                return;
+            }
+            players[player.getXuid()] = rank;
+            command_1.commandPerm.reload();
+            resolve();
+        });
     }
-    Ranks.remove = remove;
-    function getRank(index) {
-        if (getRanks().length - 1 < index || 0 > index)
-            return "";
-        else
-            return getRanks()[index];
+    /**Get player rank */
+    static getRank(player) {
+        if (player.getXuid() === "")
+            return __1.RankPerms.getRanks()[0];
+        if (!this.has(player.getXuid()))
+            this.addPlayer(player);
+        if (!__1.RankPerms.hasRank(players[player.getXuid()])) {
+            players[player.getXuid()] = __1.RankPerms.getRanks()[0];
+            command_1.commandPerm.reload();
+        }
+        return players[player.getXuid()];
     }
-    Ranks.getRank = getRank;
-    function getRanks() {
-        return Object.keys(ranks);
+    /**Set player rank */
+    async setRank(rank) {
+        return new Promise((resolve, reject) => {
+            if (!PlayerRank.has(this.xuid)) {
+                reject(`Xuid not found!`);
+                return;
+            }
+            if (!__1.RankPerms.hasRank(rank)) {
+                reject(`Rank not found!`);
+                return;
+            }
+            players[this.xuid] = rank;
+            command_1.commandPerm.reload();
+            resolve();
+        });
     }
-    Ranks.getRanks = getRanks;
-    function has(rank) {
-        return ranks.hasOwnProperty(rank);
+    /**Get player rank */
+    getRank() {
+        if (!PlayerRank.has(this.xuid))
+            return __1.RankPerms.getRanks()[0];
+        if (!__1.RankPerms.hasRank(players[this.xuid])) {
+            players[this.xuid] = __1.RankPerms.getRanks()[0];
+            command_1.commandPerm.reload();
+        }
+        return players[this.xuid];
     }
-    Ranks.has = has;
-    function setDisplay(rank, display) {
-        if (!ranks.hasOwnProperty(rank))
-            return false;
-        ranks[rank].display = display.replace(/&/g, "§");
-        return true;
-    }
-    Ranks.setDisplay = setDisplay;
-    function getDisplay(rank) {
-        if (!ranks.hasOwnProperty(rank))
-            return null;
-        else
-            return ranks[rank].display.replace(/&/g, "§");
-    }
-    Ranks.getDisplay = getDisplay;
-    function save(message = false, actor) {
-        const send = new message_1.sendMessage(actor);
-        fs.writeFile(rankPath, JSON.stringify(ranks, null, 2), "utf8", (err) => {
+    /**Save */
+    static save(message = false) {
+        fs.writeFile(playerRankPath, JSON.stringify(players, null, 4), "utf8", (err) => {
             if (message) {
-                if (err) {
-                    send.error(`ranks.json ${err}`);
-                    throw err;
-                }
+                if (err)
+                    message_1.send.error(`players.json ${err}`);
                 else
-                    send.success(`ranks.json Saved!`);
+                    message_1.send.success(`players.json Saved!`);
             }
         });
     }
-    Ranks.save = save;
-})(Ranks = exports.Ranks || (exports.Ranks = {}));
-var Permission;
-(function (Permission) {
-    function add(rank, permission) {
-        if (!ranks.hasOwnProperty(rank))
-            return false;
-        if (permission === "" || permission.includes(" "))
-            return false;
-        if (ranks[rank].permissions.includes(rank))
-            return false;
-        ranks[rank].permissions.push(permission);
-        return true;
-    }
-    Permission.add = add;
-    function remove(rank, permission) {
-        if (!ranks.hasOwnProperty(rank))
-            return false;
-        if (!ranks[rank].permissions.includes(permission))
-            return false;
-        ranks[rank].permissions = ranks[rank].permissions.filter((perm) => perm !== permission);
-        return true;
-    }
-    Permission.remove = remove;
-    function set(rank, permission, newPermission) {
-        if (!ranks.hasOwnProperty(rank))
-            return false;
-        if (!ranks[rank].permissions.includes(permission))
-            return false;
-        if (ranks[rank].permissions.includes(newPermission))
-            return false;
-        ranks[rank].permissions[ranks[rank].permissions.indexOf(permission)] = newPermission;
-        return true;
-    }
-    Permission.set = set;
-    function has(rank, permission) {
-        if (!ranks.hasOwnProperty(rank))
-            return false;
-        return ranks[rank].permissions.includes(permission);
-    }
-    Permission.has = has;
-    function getPermissions(rank) {
-        if (!ranks.hasOwnProperty(rank))
-            return [];
-        else
-            return ranks[rank].permissions;
-    }
-    Permission.getPermissions = getPermissions;
-})(Permission = exports.Permission || (exports.Permission = {}));
-//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiaW5kZXguanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyJpbmRleC50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiOzs7QUFDQSw2Q0FBOEM7QUFDOUMsNkJBQTZCO0FBQzdCLHlCQUF5QjtBQUN6QixvQkFBa0I7QUFDbEIscUJBQW1CO0FBT25CLElBQUksS0FBSyxHQUF5QjtJQUM5QixLQUFLLEVBQUU7UUFDSCxPQUFPLEVBQUUsV0FBVztRQUNwQixXQUFXLEVBQUU7WUFDVCwyQkFBMkI7U0FDOUI7S0FDSjtJQUNELEtBQUssRUFBRTtRQUNILE9BQU8sRUFBRSxXQUFXO1FBQ3BCLFdBQVcsRUFBRTtZQUNULDJCQUEyQjtZQUMzQiw0QkFBNEI7U0FDL0I7S0FDSjtJQUNELEtBQUssRUFBRTtRQUNILE9BQU8sRUFBRSxXQUFXO1FBQ3BCLFdBQVcsRUFBRTtZQUNULDJCQUEyQjtZQUMzQiw0QkFBNEI7WUFDNUIsNEJBQTRCO1lBQzVCLCtCQUErQjtTQUNsQztLQUNKO0NBQ0osQ0FBQztBQUVGLE1BQU0sUUFBUSxHQUFHLElBQUksQ0FBQyxJQUFJLENBQUMsU0FBUyxFQUFFLElBQUksRUFBRSxZQUFZLENBQUMsQ0FBQztBQUUxRCxJQUFJO0lBQUUsS0FBSyxHQUFHLE9BQU8sQ0FBQyxRQUFRLENBQUMsQ0FBQTtDQUFFO0FBQUMsT0FBTSxHQUFHLEVBQUU7SUFDekMsSUFBSSxHQUFHO1FBQUUsRUFBRSxDQUFDLGFBQWEsQ0FBQyxRQUFRLEVBQUUsSUFBSSxDQUFDLFNBQVMsQ0FBQyxLQUFLLENBQUMsRUFBRSxNQUFNLENBQUMsQ0FBQztDQUN0RTtBQUVELElBQWlCLEtBQUssQ0F5RHJCO0FBekRELFdBQWlCLEtBQUs7SUFDbEIsU0FBZ0IsR0FBRyxDQUFDLElBQVksRUFBRSxPQUFnQjtRQUM5QyxJQUFJLEtBQUssQ0FBQyxjQUFjLENBQUMsSUFBSSxDQUFDO1lBQUUsT0FBTyxLQUFLLENBQUM7UUFDN0MsSUFBSSxJQUFJLEtBQUssRUFBRSxJQUFFLElBQUksQ0FBQyxRQUFRLENBQUMsR0FBRyxDQUFDO1lBQUUsT0FBTyxLQUFLLENBQUM7UUFFbEQsS0FBSyxDQUFDLElBQUksQ0FBQyxHQUFHO1lBQ1YsT0FBTyxFQUFFLE9BQU8sYUFBUCxPQUFPLGNBQVAsT0FBTyxHQUFJLElBQUk7WUFDeEIsV0FBVyxFQUFFLEVBQUU7U0FDbEIsQ0FBQztRQUNGLE9BQU8sSUFBSSxDQUFDO0lBQ2hCLENBQUM7SUFUZSxTQUFHLE1BU2xCLENBQUE7SUFFRCxTQUFnQixNQUFNLENBQUMsSUFBWTtRQUMvQixJQUFJLENBQUMsS0FBSyxDQUFDLGNBQWMsQ0FBQyxJQUFJLENBQUM7WUFBRSxPQUFPLEtBQUssQ0FBQztRQUM5QyxJQUFJLFFBQVEsRUFBRSxDQUFDLE1BQU0sS0FBSyxDQUFDO1lBQUUsT0FBTyxLQUFLLENBQUM7UUFFMUMsT0FBTyxLQUFLLENBQUMsSUFBSSxDQUFDLENBQUM7UUFDbkIsT0FBTyxJQUFJLENBQUM7SUFDaEIsQ0FBQztJQU5lLFlBQU0sU0FNckIsQ0FBQTtJQUVELFNBQWdCLE9BQU8sQ0FBQyxLQUFhO1FBQ2pDLElBQUksUUFBUSxFQUFFLENBQUMsTUFBTSxHQUFDLENBQUMsR0FBRyxLQUFLLElBQUUsQ0FBQyxHQUFHLEtBQUs7WUFBRSxPQUFPLEVBQUUsQ0FBQzs7WUFDakQsT0FBTyxRQUFRLEVBQUUsQ0FBQyxLQUFLLENBQUMsQ0FBQztJQUNsQyxDQUFDO0lBSGUsYUFBTyxVQUd0QixDQUFBO0lBRUQsU0FBZ0IsUUFBUTtRQUNwQixPQUFPLE1BQU0sQ0FBQyxJQUFJLENBQUMsS0FBSyxDQUFDLENBQUM7SUFDOUIsQ0FBQztJQUZlLGNBQVEsV0FFdkIsQ0FBQTtJQUVELFNBQWdCLEdBQUcsQ0FBQyxJQUFZO1FBQzVCLE9BQU8sS0FBSyxDQUFDLGNBQWMsQ0FBQyxJQUFJLENBQUMsQ0FBQztJQUN0QyxDQUFDO0lBRmUsU0FBRyxNQUVsQixDQUFBO0lBRUQsU0FBZ0IsVUFBVSxDQUFDLElBQVksRUFBRSxPQUFlO1FBQ3BELElBQUksQ0FBQyxLQUFLLENBQUMsY0FBYyxDQUFDLElBQUksQ0FBQztZQUFFLE9BQU8sS0FBSyxDQUFDO1FBRTlDLEtBQUssQ0FBQyxJQUFJLENBQUMsQ0FBQyxPQUFPLEdBQUMsT0FBTyxDQUFDLE9BQU8sQ0FBQyxJQUFJLEVBQUUsR0FBRyxDQUFDLENBQUM7UUFDL0MsT0FBTyxJQUFJLENBQUM7SUFDaEIsQ0FBQztJQUxlLGdCQUFVLGFBS3pCLENBQUE7SUFFRCxTQUFnQixVQUFVLENBQUMsSUFBWTtRQUNuQyxJQUFJLENBQUMsS0FBSyxDQUFDLGNBQWMsQ0FBQyxJQUFJLENBQUM7WUFBRSxPQUFPLElBQUksQ0FBQzs7WUFDeEMsT0FBTyxLQUFLLENBQUMsSUFBSSxDQUFDLENBQUMsT0FBTyxDQUFDLE9BQU8sQ0FBQyxJQUFJLEVBQUUsR0FBRyxDQUFDLENBQUM7SUFDdkQsQ0FBQztJQUhlLGdCQUFVLGFBR3pCLENBQUE7SUFFRCxTQUFnQixJQUFJLENBQUMsVUFBbUIsS0FBSyxFQUFFLEtBQW9CO1FBQy9ELE1BQU0sSUFBSSxHQUFHLElBQUkscUJBQVcsQ0FBQyxLQUFLLENBQUMsQ0FBQztRQUNwQyxFQUFFLENBQUMsU0FBUyxDQUFDLFFBQVEsRUFBRSxJQUFJLENBQUMsU0FBUyxDQUFDLEtBQUssRUFBRSxJQUFJLEVBQUUsQ0FBQyxDQUFDLEVBQUUsTUFBTSxFQUFFLENBQUMsR0FBRyxFQUFFLEVBQUU7WUFDbkUsSUFBSSxPQUFPLEVBQUU7Z0JBQ1QsSUFBSSxHQUFHLEVBQUU7b0JBQ0wsSUFBSSxDQUFDLEtBQUssQ0FBQyxjQUFjLEdBQUcsRUFBRSxDQUFDLENBQUM7b0JBQ2hDLE1BQU0sR0FBRyxDQUFDO2lCQUNiOztvQkFDSSxJQUFJLENBQUMsT0FBTyxDQUFDLG1CQUFtQixDQUFDLENBQUM7YUFDMUM7UUFDTCxDQUFDLENBQUMsQ0FBQztJQUNQLENBQUM7SUFYZSxVQUFJLE9BV25CLENBQUE7QUFDTCxDQUFDLEVBekRnQixLQUFLLEdBQUwsYUFBSyxLQUFMLGFBQUssUUF5RHJCO0FBRUQsSUFBaUIsVUFBVSxDQW9DMUI7QUFwQ0QsV0FBaUIsVUFBVTtJQUN2QixTQUFnQixHQUFHLENBQUMsSUFBWSxFQUFFLFVBQWtCO1FBQ2hELElBQUksQ0FBQyxLQUFLLENBQUMsY0FBYyxDQUFDLElBQUksQ0FBQztZQUFFLE9BQU8sS0FBSyxDQUFDO1FBQzlDLElBQUksVUFBVSxLQUFLLEVBQUUsSUFBRSxVQUFVLENBQUMsUUFBUSxDQUFDLEdBQUcsQ0FBQztZQUFFLE9BQU8sS0FBSyxDQUFDO1FBQzlELElBQUksS0FBSyxDQUFDLElBQUksQ0FBQyxDQUFDLFdBQVcsQ0FBQyxRQUFRLENBQUMsSUFBSSxDQUFDO1lBQUUsT0FBTyxLQUFLLENBQUM7UUFFekQsS0FBSyxDQUFDLElBQUksQ0FBQyxDQUFDLFdBQVcsQ0FBQyxJQUFJLENBQUMsVUFBVSxDQUFDLENBQUM7UUFDekMsT0FBTyxJQUFJLENBQUM7SUFDaEIsQ0FBQztJQVBlLGNBQUcsTUFPbEIsQ0FBQTtJQUVELFNBQWdCLE1BQU0sQ0FBQyxJQUFZLEVBQUUsVUFBa0I7UUFDbkQsSUFBSSxDQUFDLEtBQUssQ0FBQyxjQUFjLENBQUMsSUFBSSxDQUFDO1lBQUUsT0FBTyxLQUFLLENBQUM7UUFDOUMsSUFBSSxDQUFDLEtBQUssQ0FBQyxJQUFJLENBQUMsQ0FBQyxXQUFXLENBQUMsUUFBUSxDQUFDLFVBQVUsQ0FBQztZQUFFLE9BQU8sS0FBSyxDQUFDO1FBRWhFLEtBQUssQ0FBQyxJQUFJLENBQUMsQ0FBQyxXQUFXLEdBQUMsS0FBSyxDQUFDLElBQUksQ0FBQyxDQUFDLFdBQVcsQ0FBQyxNQUFNLENBQUMsQ0FBQyxJQUFJLEVBQUUsRUFBRSxDQUFDLElBQUksS0FBSyxVQUFVLENBQUMsQ0FBQztRQUN0RixPQUFPLElBQUksQ0FBQztJQUNoQixDQUFDO0lBTmUsaUJBQU0sU0FNckIsQ0FBQTtJQUVELFNBQWdCLEdBQUcsQ0FBQyxJQUFZLEVBQUUsVUFBa0IsRUFBRSxhQUFxQjtRQUN2RSxJQUFJLENBQUMsS0FBSyxDQUFDLGNBQWMsQ0FBQyxJQUFJLENBQUM7WUFBRSxPQUFPLEtBQUssQ0FBQztRQUM5QyxJQUFJLENBQUMsS0FBSyxDQUFDLElBQUksQ0FBQyxDQUFDLFdBQVcsQ0FBQyxRQUFRLENBQUMsVUFBVSxDQUFDO1lBQUUsT0FBTyxLQUFLLENBQUM7UUFDaEUsSUFBSSxLQUFLLENBQUMsSUFBSSxDQUFDLENBQUMsV0FBVyxDQUFDLFFBQVEsQ0FBQyxhQUFhLENBQUM7WUFBRSxPQUFPLEtBQUssQ0FBQztRQUVsRSxLQUFLLENBQUMsSUFBSSxDQUFDLENBQUMsV0FBVyxDQUFDLEtBQUssQ0FBQyxJQUFJLENBQUMsQ0FBQyxXQUFXLENBQUMsT0FBTyxDQUFDLFVBQVUsQ0FBQyxDQUFDLEdBQUMsYUFBYSxDQUFDO1FBQ25GLE9BQU8sSUFBSSxDQUFDO0lBQ2hCLENBQUM7SUFQZSxjQUFHLE1BT2xCLENBQUE7SUFFRCxTQUFnQixHQUFHLENBQUMsSUFBWSxFQUFFLFVBQWtCO1FBQ2hELElBQUksQ0FBQyxLQUFLLENBQUMsY0FBYyxDQUFDLElBQUksQ0FBQztZQUFFLE9BQU8sS0FBSyxDQUFDO1FBQzlDLE9BQU8sS0FBSyxDQUFDLElBQUksQ0FBQyxDQUFDLFdBQVcsQ0FBQyxRQUFRLENBQUMsVUFBVSxDQUFDLENBQUM7SUFDeEQsQ0FBQztJQUhlLGNBQUcsTUFHbEIsQ0FBQTtJQUVELFNBQWdCLGNBQWMsQ0FBQyxJQUFZO1FBQ3ZDLElBQUksQ0FBQyxLQUFLLENBQUMsY0FBYyxDQUFDLElBQUksQ0FBQztZQUFFLE9BQU8sRUFBRSxDQUFDOztZQUN0QyxPQUFPLEtBQUssQ0FBQyxJQUFJLENBQUMsQ0FBQyxXQUFXLENBQUM7SUFDeEMsQ0FBQztJQUhlLHlCQUFjLGlCQUc3QixDQUFBO0FBQ0wsQ0FBQyxFQXBDZ0IsVUFBVSxHQUFWLGtCQUFVLEtBQVYsa0JBQVUsUUFvQzFCIn0=
+}
+exports.PlayerRank = PlayerRank;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiaW5kZXguanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyJpbmRleC50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiOzs7QUFDQSwwQkFBK0I7QUFDL0IsNkNBQXVDO0FBQ3ZDLHVDQUF3QztBQUN4Qyw2QkFBNkI7QUFDN0IseUJBQXlCO0FBRXpCLElBQUksT0FBTyxHQUEyQixFQUFFLENBQUM7QUFDekMsTUFBTSxjQUFjLEdBQUcsSUFBSSxDQUFDLElBQUksQ0FBQyxTQUFTLEVBQUUsSUFBSSxFQUFFLGNBQWMsQ0FBQyxDQUFDO0FBRWxFLElBQUk7SUFBRSxPQUFPLEdBQUcsT0FBTyxDQUFDLGNBQWMsQ0FBQyxDQUFBO0NBQUU7QUFBQyxPQUFNLEdBQUcsRUFBRTtJQUNqRCxJQUFJLEdBQUc7UUFBRSxFQUFFLENBQUMsYUFBYSxDQUFDLGNBQWMsRUFBRSxJQUFJLENBQUMsU0FBUyxDQUFDLE9BQU8sQ0FBQyxFQUFFLE1BQU0sQ0FBQyxDQUFDO0NBQzlFO0FBRUQsZ0JBQWdCO0FBQ2hCLE1BQWEsVUFBVTtJQUNuQixZQUFvQixJQUFZO1FBQVosU0FBSSxHQUFKLElBQUksQ0FBUTtJQUFHLENBQUM7SUFFcEMsTUFBTSxDQUFDLElBQUksQ0FBQyxNQUFjO1FBQ3RCLE9BQU8sSUFBSSxVQUFVLENBQUMsTUFBTSxDQUFDLE9BQU8sRUFBRSxDQUFDLENBQUM7SUFDNUMsQ0FBQztJQUVELE1BQU0sQ0FBQyxVQUFVLENBQUMsSUFBWTtRQUMxQixPQUFPLElBQUksVUFBVSxDQUFDLElBQUksQ0FBQyxDQUFDO0lBQ2hDLENBQUM7SUFFRCxNQUFNLENBQUMsR0FBRyxDQUFDLElBQVk7UUFDbkIsT0FBTyxPQUFPLENBQUMsY0FBYyxDQUFDLElBQUksQ0FBQyxDQUFDO0lBQ3hDLENBQUM7SUFFRCxnQkFBZ0I7SUFDaEIsTUFBTSxDQUFDLFNBQVMsQ0FBQyxNQUFjO1FBQzNCLElBQUksTUFBTSxDQUFDLE9BQU8sRUFBRSxLQUFLLEVBQUU7WUFBRSxPQUFPLEtBQUssQ0FB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

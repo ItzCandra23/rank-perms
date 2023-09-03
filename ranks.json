@@ -1,28 +1,28 @@
 {
-  "Guest": {
-    "display": "&l&aGuest",
-    "permissions": [
-      "rank-perms.command.myrank",
-      "rank-chat.command.chat",
-      "rank-chat.command.replay"
-    ]
-  },
-  "Admin": {
-    "display": "&l&cAdmin",
-    "permissions": [
-      "rank-perms.command.myrank",
-      "rank-perms.command.rankadm",
-      "rank-chat.command.chat",
-      "rank-chat.command.replay"
-    ]
-  },
-  "Owner": {
-    "display": "&l&dOwner",
-    "permissions": [
-      "rank-perms.command.myrank",
-      "rank-perms.command.rankadm",
-      "rank-perms.command.setrank",
-      "rank-perms.command.rankreload"
-    ]
-  }
+    "Guest": {
+        "display": "§l§aGuest",
+        "permissions": [
+            "rank-perms.command.myrank",
+            "rank-chat.command.chat",
+            "rank-chat.command.replay"
+        ]
+    },
+    "Admin": {
+        "display": "§l§cAdmin",
+        "permissions": [
+            "rank-perms.command.myrank",
+            "rank-perms.command.rankadm",
+            "rank-chat.command.chat",
+            "rank-chat.command.replay"
+        ]
+    },
+    "Owner": {
+        "display": "§l§dOwner",
+        "permissions": [
+            "rank-perms.command.myrank",
+            "rank-perms.command.rankadm",
+            "rank-perms.command.setrank",
+            "rank-perms.command.rankreload"
+        ]
+    }
 }

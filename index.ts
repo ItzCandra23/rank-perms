@@ -1,173 +1,263 @@
 import { Player } from "bdsx/bds/player";
-import { send, sendMessage } from "./src/utils/message";
-import { Permission, Ranks } from "./src";
-import { PlayerRank } from "./src/player";
+import { PlayerRank } from "./src";
+import { send } from "./src/utils/message";
 import { events } from "bdsx/event";
 import { commandPerm } from "./src/command";
+import * as path from "path";
+import * as fs from "fs";
 
+export interface Rank {
+    display: string;
+    permissions: string[];
+}
+
+let ranks: Record<string, Rank> = {
+    Guest: {
+        display: "§l§aGuest",
+        permissions: [
+            "rank-perms.command.myrank",
+        ],
+    },
+    Admin: {
+        display: "§l§cAdmin",
+        permissions: [
+            "rank-perms.command.myrank",
+            "rank-perms.command.rankadm",
+        ],
+    },
+    Owner: {
+        display: "§l§dOwner",
+        permissions: [
+            "rank-perms.command.myrank",
+            "rank-perms.command.rankadm",
+            "rank-perms.command.setrank",
+            "rank-perms.command.rankreload",
+        ],
+    },
+};
+
+const rankPath = path.join(__dirname, "ranks.json");
+
+try { ranks = require(rankPath) } catch(err) {
+    if (err) send.error(err);
+}
+
+/**RankPermissions */
 export namespace RankPerms {
-    export function createRank(rank: string, display?: string, actor?: Player): boolean {
-        const send = new sendMessage(actor);
-        if (Ranks.has(rank)) {
-            send.error(`Rank already!`);
-            return false;
-        }
-        if (rank === ""||rank.includes(" ")||rank.includes("§")||rank.includes("&")) {
-            send.error(`Invalid rank.`);
-            return false;
-        }
-        if (rank.length > 16) {
-            send.error(`Rank rank too long.`);
-            return false;
-        }
 
-        send.success(`Success to create ${rank} in ranks`);
-        return Ranks.add(rank, display);
+    /**Create new rank */
+    export async function createRank(rank: string, display: string = rank): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const textPattern = /^[A-Za-z0-9]+$/;
+            if (hasRank(rank)) {
+                reject(`Rank already!`);
+                return;
+            }
+            if (textPattern.test(rank)||rank === "") {
+                reject(`Invalid rank!`);
+                return;
+            }
+            if (rank.length > 16) {
+                reject(`Rank rank too long`);
+                return;
+            }
+
+            ranks[rank] = {
+                display: display,
+                permissions: [],
+            }
+            resolve();
+        });
     }
 
-    export function deleteRank(rank: string, actor?: Player): boolean {
-        const send = new sendMessage(actor);
-        if (!Ranks.has(rank)) {
-            send.error(`Rank not found!`);
-            return false;
-        }
-        if (Ranks.getRanks().length === 1) {
-            send.error(`You can't delete last rank`);
-            return false;
-        }
+    /**Delete rank */
+    export function deleteRank(rank: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            if (!hasRank(rank)) {
+                reject(`Rank not found!`);
+                return;
+            }
+            if (getRanks().length === 1) {
+                reject(`You can't delete last rank`);
+                return;
+            }
 
-        send.success(`Success to delete ${rank} in ranks`);
-        return Ranks.remove(rank);
+            delete ranks[rank];
+            resolve();
+        });
     }
 
-    export const permissions = Permissions;
+    /**Get rank */
+    export function getRank(rank: string): Rank|null {
+        return ranks[rank] ?? null;
+    }
 
+    /**Get rank display */
+    export function getDisplay(rank: string): string|null {
+        return getRank(rank)?.display ?? null;
+    }
+
+    /**Get all rank permissions */
+    export function getPermissions(rank: string): string[] {
+        return Permissions.getPermissions(rank);
+    }
+
+    /**Get rank permissions */
+    export function permissions(rank: string): Permissions|null {
+        if (!hasRank(rank)) return null;
+        return new Permissions(rank);
+    }
+
+    /**Get player rank */
+    export function playerRank(player: Player): PlayerRank {
+        return PlayerRank.rank(player);
+    }
+
+    /**Check rank */
+    export function hasRank(rank: string): boolean {
+        return ranks.hasOwnProperty(rank);
+    }
+
+    /**Get all ranks */
     export function getRanks(): string[] {
-        return Ranks.getRanks();
+        return Object.keys(ranks);
     }
 
-    export function has(rank: string): boolean {
-        return Ranks.has(rank);
-    }
-
-    export function setPlayerRank(player: Player, rank: string): boolean {
-        return PlayerRank.setRank(rank, player.getXuid());
-    }
-
-    export function getPlayerRank(player: Player): string|null {
-        return PlayerRank.getRank(player.getXuid());
-    }
-
-    export function setDisplayRank(rank: string, display: string): boolean {
-        return Ranks.setDisplay(rank, display);
-    }
-
-    export function getDisplayRank(rank: string): string|null {
-        return Ranks.getDisplay(rank);
-    }
-
+    /**Save */
     export function save(message: boolean = false) {
-        Ranks.save(message);
-        PlayerRank.save(message);
+        fs.writeFile(rankPath, JSON.stringify(ranks, null, 4), "utf8", (err) => {
+            if (message) {
+                if (err) send.error(`ranks.json ${err}`);
+                else send.success(`ranks.json Saved!`);
+            }
+        });
     }
 }
 
-export namespace Permissions {
-    export function check(perm: string, player: Player): boolean {
-        const rank = PlayerRank.getRank(player.getXuid());
-        if (!rank) return Permission.has(Ranks.getRanks()[0], perm);
-        return Permission.has(rank, perm);
+/**Permissions */
+export class Permissions {
+    constructor(private rank: string) {}
+
+    /**Check player permission */
+    static check(perm: string, player: Player): boolean {
+        const rank = PlayerRank.getRank(player);
+        if (!rank) return Permissions.hasPermission(RankPerms.getRanks()[0], perm);
+        return Permissions.hasPermission(rank, perm);
     }
 
-    export function registerCommand(name: string, perm: string): boolean {
+    /**Register permission Command */
+    static registerCommand(name: string, perm: string): boolean {
         if (commandPerm.find(name)) return false;
         else return commandPerm.setPermission(name, perm);
     }
 
-    export function setRank(rank: string, player: Player, actor?: Player): boolean {
-        const xuid = player.getXuid();
-        const send = new sendMessage(actor);
-        if (xuid === ""||xuid.includes(" ")) {
-            send.error(`Xuid not found!`);
-            return false;
-        }
-        if (!Ranks.has(rank)) {
-            send.error(`Rank not found!`);
-            return false;
-        }
-
-        send.success(`Success to set ${player.getNameTag()} in ${rank} rank`);
-        return PlayerRank.setRank(rank, xuid);
+    /**Check permission in rank */
+    static hasPermission(rank: string, permission: string): boolean {
+        if (!RankPerms.hasRank(rank)) return false;
+        return ranks[rank].permissions.includes(permission);
     }
 
-    export function getRank(player: Player): string {
-        return PlayerRank.getRank(player.getXuid()) ?? Ranks.getRanks()[0];
+    /**Get all permissions in rank */
+    static getPermissions(rank: string): string[] {
+        const data = RankPerms.getRank(rank);
+        if (!data) return [];
+        else return data.permissions;
     }
 
-    export function addPermission(rank: string, permission: string, actor?: Player): boolean {
-        const send = new sendMessage(actor);
-        if (!Ranks.has(rank)) {
-            send.error(`Rank not found!`);
-            return false;
-        }
-        if (Permission.has(rank, permission)) {
-            send.error(`Permission already!`);
-            return false;
-        }
-        if (permission === ""||permission.includes(" ")) {
-            send.error(`Invalid permission.`);
-            return false;
-        }
+    /**Add permission */
+    static async addPermission(rank: string, permission: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const textPattern = /^[a-z.]+$/;
+            const data = RankPerms.getRank(rank);
+            if (!data) {
+                reject(`Rank not found!`);
+                return;
+            }
+            if (textPattern.test(permission)||permission === "") {
+                reject(`Invalid permission!`);
+                return;
+            }
+            if (data.permissions.includes(rank)) {
+                reject(`Permission already!`);
+                return;
+            };
 
-        send.success(`Success to add ${permission}&r in ${rank} permissions`);
-        return Permission.add(rank, permission);
+            ranks[rank].permissions.push(permission);
+            commandPerm.reload();
+            resolve();
+        });
     }
 
-    export function removePermission(rank: string, permission: string, actor?: Player): boolean {
-        const send = new sendMessage(actor);
-        if (!Ranks.has(rank)) {
-            send.error(`Rank not found!`);
-            return false;
-        }
-        if (!Permission.has(rank, permission)) {
-            send.error(`Permission not found!`);
-            return false;
-        }
+    /**Remove permission */
+    static async removePermission(rank: string, permission: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const data = RankPerms.getRank(rank);
+            if (!data) {
+                reject(`Rank not found!`);
+                return;
+            }
+            if (!data.permissions.includes(permission)) {
+                reject(`Permission not found!`);
+                return;
+            };
 
-        send.success(`Success to remove ${permission}&r in ${rank} permissions`);
-        return Permission.remove(rank, permission);
+            ranks[rank].permissions=ranks[rank].permissions.filter((perm) => perm !== permission);
+            commandPerm.reload();
+            resolve();
+        });
     }
 
-    export function setPermission(rank: string, permission: string, newPermission: string, actor?: Player): boolean {
-        const send = new sendMessage(actor);
-        if (!Ranks.has(rank)) {
-            send.error(`Rank not found!`);
-            return false;
-        }
-        if (!Permission.has(rank, permission)) {
-            send.error(`Permission not found!`);
-            return false;
-        }
-        if (Permission.has(rank, newPermission)) {
-            send.error(`Permission already!`);
-            return false;
-        }
+    /**Set permission */
+    static async setPermission(rank: string, permission: string, newPermission: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const data = RankPerms.getRank(rank);
+            if (!data) {
+                reject(`Rank not found!`);
+                return;
+            }
+            if (!data.permissions.includes(permission)) {
+                reject(`Permission not found!`);
+                return;
+            }
+            if (data.permissions.includes(newPermission)) {
+                reject(`New permission already!`);
+                return;
+            }
 
-        send.success(`Success to change ${permission}&r to ${newPermission}&r in ${rank} permissions`);
-        return Permission.set(rank, permission, newPermission);
+            ranks[rank].permissions[data.permissions.indexOf(permission)]=newPermission;
+            commandPerm.reload();
+            resolve();
+        });
     }
 
-    export function has(rank: string, permission: string): boolean {
-        return Permission.has(rank, permission);
+    /**Check permission in rank */
+    hasPermission(permission: string): boolean {
+        return Permissions.hasPermission(this.rank, permission);
     }
 
-    export function getPermissions(rank: string): string[] {
-        return Permission.getPermissions(rank);
+    /**Get all permissions in rank */
+    getPermissions(): string[] {
+        return Permissions.getPermissions(this.rank);
+    }
+
+    /**Add permission */
+    async addPermission(permission: string): Promise<void> {
+        return Permissions.addPermission(this.rank, permission);
+    }
+
+    /**Remove permission */
+    async removePermission(permission: string): Promise<void> {
+        return Permissions.removePermission(this.rank, permission);
+    }
+
+    /**Set permission */
+    async setPermission(permission: string, newPermission: string): Promise<void> {
+        return Permissions.setPermission(this.rank, permission, newPermission);
     }
 }
 
 events.playerJoin.on((ev) => {
-    PlayerRank.addPlayer(ev.player.getXuid());
+    PlayerRank.addPlayer(ev.player);
 });
 
 events.serverOpen.on(() => {
@@ -178,4 +268,5 @@ events.serverOpen.on(() => {
 
 events.serverClose.on(() => {
     RankPerms.save(true);
+    PlayerRank.save(true);
 });

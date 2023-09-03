@@ -1,139 +1,111 @@
-import { ServerPlayer } from "bdsx/bds/player";
-import { sendMessage } from "./utils/message";
+import { Player } from "bdsx/bds/player";
+import { RankPerms } from "..";
+import { send } from "./utils/message";
+import { commandPerm } from "./command";
 import * as path from "path";
 import * as fs from "fs";
-import "./player";
-import "./command";
 
-export interface Rank {
-    display: string;
-    permissions: string[];
+let players: Record<string, string> = {};
+const playerRankPath = path.join(__dirname, "..", "players.json");
+
+try { players = require(playerRankPath) } catch(err) {
+    if (err) fs.writeFileSync(playerRankPath, JSON.stringify(players), "utf8");
 }
 
-let ranks: Record<string, Rank> = {
-    Guest: {
-        display: "&l&aGuest",
-        permissions: [
-            "rank-perms.command.myrank",
-        ],
-    },
-    Admin: {
-        display: "&l&cAdmin",
-        permissions: [
-            "rank-perms.command.myrank",
-            "rank-perms.command.rankadm",
-        ],
-    },
-    Owner: {
-        display: "&l&dOwner",
-        permissions: [
-            "rank-perms.command.myrank",
-            "rank-perms.command.rankadm",
-            "rank-perms.command.setrank",
-            "rank-perms.command.rankreload",
-        ],
-    },
-};
+/**PlayerRank */
+export class PlayerRank {
+    constructor(private xuid: string) {}
 
-const rankPath = path.join(__dirname, "..", "ranks.json");
+    static rank(player: Player): PlayerRank {
+        return new PlayerRank(player.getXuid());
+    }
 
-try { ranks = require(rankPath) } catch(err) {
-    if (err) fs.writeFileSync(rankPath, JSON.stringify(ranks), "utf8");
-}
+    static rankByXuid(xuid: string): PlayerRank {
+        return new PlayerRank(xuid);
+    }
 
-export namespace Ranks {
-    export function add(name: string, display?: string): boolean {
-        if (ranks.hasOwnProperty(name)) return false;
-        if (name === ""||name.includes(" ")) return false;
+    static has(xuid: string): boolean {
+        return players.hasOwnProperty(xuid);
+    }
 
-        ranks[name] = {
-            display: display ?? name,
-            permissions: [],
-        };
+    /**Add player */
+    static addPlayer(player: Player): boolean {
+        if (player.getXuid() === "") return false;
+        if (this.has(player.getXuid())) return false;
+
+        players[player.getXuid()]=RankPerms.getRanks()[0];
         return true;
     }
 
-    export function remove(rank: string): boolean {
-        if (!ranks.hasOwnProperty(rank)) return false;
-        if (getRanks().length === 1) return false;
-
-        delete ranks[rank];
-        return true;
-    }
-
-    export function getRank(index: number): string {
-        if (getRanks().length-1 < index||0 > index) return "";
-        else return getRanks()[index];
-    }
-
-    export function getRanks(): string[] {
-        return Object.keys(ranks);
-    }
-
-    export function has(rank: string): boolean {
-        return ranks.hasOwnProperty(rank);
-    }
-
-    export function setDisplay(rank: string, display: string): boolean {
-        if (!ranks.hasOwnProperty(rank)) return false;
-
-        ranks[rank].display=display.replace(/&/g, "§");
-        return true;
-    }
-
-    export function getDisplay(rank: string): string|null {
-        if (!ranks.hasOwnProperty(rank)) return null;
-        else return ranks[rank].display.replace(/&/g, "§");
-    }
-
-    export function save(message: boolean = false, actor?: ServerPlayer): void {
-        const send = new sendMessage(actor);
-        fs.writeFile(rankPath, JSON.stringify(ranks, null, 2), "utf8", (err) => {
-            if (message) {
-                if (err) {
-                    send.error(`ranks.json ${err}`);
-                    throw err;
-                }
-                else send.success(`ranks.json Saved!`);
+    /**Set player rank */
+    static async setRank(player: Player, rank: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            if (player.getXuid() === "") {
+                reject(`Xuid not found!`);
+                return;
             }
+            if (!RankPerms.hasRank(rank)) {
+                reject(`Rank not found!`);
+                return;
+            }
+
+            players[player.getXuid()]=rank;
+            commandPerm.reload();
+
+            resolve();
         });
     }
-}
 
-export namespace Permission {
-    export function add(rank: string, permission: string): boolean {
-        if (!ranks.hasOwnProperty(rank)) return false;
-        if (permission === ""||permission.includes(" ")) return false;
-        if (ranks[rank].permissions.includes(rank)) return false;
+    /**Get player rank */
+    static getRank(player: Player): string {
+        if (player.getXuid() === "") return RankPerms.getRanks()[0];
+        if (!this.has(player.getXuid())) this.addPlayer(player);
 
-        ranks[rank].permissions.push(permission);
-        return true;
+        if (!RankPerms.hasRank(players[player.getXuid()])) {
+            players[player.getXuid()]=RankPerms.getRanks()[0];
+            commandPerm.reload();
+        }
+
+        return players[player.getXuid()];
     }
 
-    export function remove(rank: string, permission: string): boolean {
-        if (!ranks.hasOwnProperty(rank)) return false;
-        if (!ranks[rank].permissions.includes(permission)) return false;
+    /**Set player rank */
+    async setRank(rank: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            if (!PlayerRank.has(this.xuid)) {
+                reject(`Xuid not found!`);
+                return;
+            }
+            if (!RankPerms.hasRank(rank)) {
+                reject(`Rank not found!`);
+                return;
+            }
 
-        ranks[rank].permissions=ranks[rank].permissions.filter((perm) => perm !== permission);
-        return true;
+            players[this.xuid]=rank;
+            commandPerm.reload();
+
+            resolve()
+        });
     }
 
-    export function set(rank: string, permission: string, newPermission: string): boolean {
-        if (!ranks.hasOwnProperty(rank)) return false;
-        if (!ranks[rank].permissions.includes(permission)) return false;
-        if (ranks[rank].permissions.includes(newPermission)) return false;
+    /**Get player rank */
+    getRank(): string {
+        if (!PlayerRank.has(this.xuid)) return RankPerms.getRanks()[0];
+        if (!RankPerms.hasRank(players[this.xuid])) {
+            players[this.xuid]=RankPerms.getRanks()[0];
+            commandPerm.reload();
+        }
 
-        ranks[rank].permissions[ranks[rank].permissions.indexOf(permission)]=newPermission;
-        return true;
+        return players[this.xuid];
     }
 
-    export function has(rank: string, permission: string): boolean {
-        if (!ranks.hasOwnProperty(rank)) return false;
-        return ranks[rank].permissions.includes(permission);
-    }
-
-    export function getPermissions(rank: string): string[] {
-        if (!ranks.hasOwnProperty(rank)) return [];
-        else return ranks[rank].permissions;
+    /**Save */
+    static save(message: boolean = false): void {
+        fs.writeFile(playerRankPath, JSON.stringify(players, null, 4), "utf8", (err) => {
+            if (message) {
+                if (err) send.error(`players.json ${err}`);
+                else send.success(`players.json Saved!`);
+            }
+        });
     }
 }
