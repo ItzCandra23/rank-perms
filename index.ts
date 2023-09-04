@@ -53,7 +53,7 @@ export namespace RankPerms {
                 reject(`Rank already!`);
                 return;
             }
-            if (textPattern.test(rank)||rank === "") {
+            if (!textPattern.test(rank)||rank === "") {
                 reject(`Invalid rank!`);
                 return;
             }
@@ -173,7 +173,7 @@ export class Permissions {
                 reject(`Rank not found!`);
                 return;
             }
-            if (textPattern.test(permission)||permission === "") {
+            if (!textPattern.test(permission)||permission === "") {
                 reject(`Invalid permission!`);
                 return;
             }
