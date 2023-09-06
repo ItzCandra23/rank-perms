@@ -34,3 +34,9 @@ commandPerm.register("heal", "Heal your health.", "heal.command.permission")
     duration: int32_t,
 });
 ```
+
+## Other
+* [Author](https://github.com/ItzCandra23)
+* [RankPerms (Github)](https://github.com/ItzCandra23/rank-perms)
+* [RankPerms (NPM)](https://www.npmjs.com/package/@bdsx/rank-perms)
+* [Discord](https://discord.gg/nVJ7cbtHgS)
